@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDRPI Image Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            color: #000;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.dark-mode {
+            background-color: #2e2e2e;
+            color: #fff;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+        }
+        .gallery img {
+            max-width: 100%;
+            max-height: 200px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .gallery img:hover {
+            transform: scale(1.05);
+        }
+        #folderSelect {
+            margin: 20px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #darkModeToggleWrapper {
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+        }
+        #darkModeToggle {
+            display: none;
+        }
+        .toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            margin-left: 10px;
+        }
+        .toggle .toggle-circle {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle {
+            background-color: #ccc;
+            border-radius: 30px;
+            transition: 0.3s;
+        }
+        #darkModeToggle:checked + .toggle .toggle-circle {
+            transform: translateX(30px);
+            background-color: #4CAF50; /* Green color for dark mode */
+        }
+
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column; /* Stack the image and the name vertically */
+        }
+
+        #imageName {
+            color: white;
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-align: center; /* Center the text */
+            width: 100%;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7); /* Added drop shadow */
+        }
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .lightbox .close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 30px;
+            color: white;
+            cursor: pointer;
+        }
+        .lightbox .arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 50px; /* Increased font size for larger arrows */
+            color: white;
+            cursor: pointer;
+            user-select: none;
+        }
+        .lightbox .left-arrow {
+            left: 20px;
+        }
+        .lightbox .right-arrow {
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>DDRPI Image Hub</h1>
+    <div id="controls">
+        <select id="folderSelect"></select>
+        <input type="text" id="searchInput" placeholder="Search images..." style="margin-left: 10px; padding: 10px;">
+        <div id="darkModeToggleWrapper">
+            <span id="darkModeText">Enable Dark Mode</span>
+            <label for="darkModeToggle">
+                <input type="checkbox" id="darkModeToggle">
+                <div class="toggle">
+                    <div class="toggle-circle"></div>
+                </div>
+            </label>
+        </div>
+    </div>
+    <div class="gallery" id="gallery"></div>
+    
+    <div class="lightbox" id="lightbox">
+        <span class="close" id="closeBtn">&times;</span>
+        <span class="arrow left-arrow" id="prevArrow">&#10094;</span>
+        <div id="imageName" style="color: white; font-size: 18px; margin-bottom: 10px;font-weight: bold;"></div> <!-- New div for image name -->
+        <img id="lightboxImg" src="">
+        <span class="arrow right-arrow" id="nextArrow">&#10095;</span>
+    </div>
+    
+    <!-- PLACEHOLDER -->
+
+    <script>
+        // Parse the JSON data from the script tag
+        const data = JSON.parse(document.getElementById("imagesData").textContent);
+    
+        const gallery = document.getElementById("gallery");
+        const folderSelect = document.getElementById("folderSelect");
+        let currentImageIndex = null;
+        let imagesToDisplay = [];
+        let filteredImages = [];
+        let currentFolder = 'All';  // Track the current folder
+    
+        // Sort folders alphabetically
+        const sortedFolders = ['All', ...data.folders.sort()]; // Add 'all' option at the start
+    
+        // Populate the folder select dropdown with sorted folders
+        folderSelect.innerHTML = sortedFolders.map(folder => `<option value="${folder}">${folder}</option>`).join('');
+    
+        function loadImages(folder) {
+            gallery.innerHTML = ''; 
+            imagesToDisplay = data.images.filter(file => {
+                // Show images only from the selected folder, or all images if "all" is selected
+                return folder === 'All' || file.startsWith(folder);
+            });
+            filteredImages = imagesToDisplay;
+            renderGallery(filteredImages);
+        }
+    
+        function renderGallery(images) {
+            gallery.innerHTML = ''; 
+            images.forEach((file, index) => {
+                const img = document.createElement("img");
+                img.src = file.replace(/\\/g, '/');  // Convert backslashes to forward slashes for the src
+                img.alt = file;
+                img.onclick = () => openLightbox(index);
+                gallery.appendChild(img);
+            });
+        }
+    
+        // Load images when the folder is changed
+        folderSelect.addEventListener('change', () => {
+            currentFolder = folderSelect.value;
+            loadImages(currentFolder);
+            filterImages();  // Filter images based on search input
+        });
+    
+        document.getElementById("searchInput").addEventListener("input", filterImages);
+    
+        // Function to filter images based on the current folder and search query
+        function filterImages() {
+            const searchQuery = document.getElementById("searchInput").value.toLowerCase();
+    
+            filteredImages = imagesToDisplay.filter(file => {
+                const fileName = file.split('/').pop().toLowerCase();
+                // Only show images from the selected folder and that include the search query
+                return (currentFolder === 'All' || file.startsWith(currentFolder)) && fileName.includes(searchQuery);
+            });
+    
+            renderGallery(filteredImages);
+        }
+    
+        // Initially load images from all folders
+        loadImages('All');
+    
+        function openLightbox(index) {
+            currentImageIndex = index;
+            const imagePath = filteredImages[currentImageIndex].replace(/\\/g, '/');
+    
+            // Extract the base name of the image (without path and extension)
+            const imageName = imagePath.split('/').pop().replace(/\.[^/.]+$/, "");
+    
+            document.getElementById("imageName").innerText = imageName;
+            document.getElementById("lightboxImg").src = imagePath;
+            document.getElementById("lightbox").style.display = "flex";
+        }
+    
+        function closeLightbox() {
+            document.getElementById("lightbox").style.display = "none";
+        }
+    
+        // Event listener for close button
+        document.getElementById("closeBtn").addEventListener("click", closeLightbox);
+    
+        // Navigate between images
+        function navigateImage(direction) {
+            if (currentImageIndex !== null) {
+                currentImageIndex = (currentImageIndex + direction + filteredImages.length) % filteredImages.length;
+                document.getElementById("lightboxImg").src = filteredImages[currentImageIndex].replace(/\\/g, '/');
+            }
+        }
+    
+        // Event listeners for arrows
+        document.getElementById("prevArrow").addEventListener("click", () => navigateImage(-1)); // Previous image
+        document.getElementById("nextArrow").addEventListener("click", () => navigateImage(1)); // Next image
+    
+        // Close lightbox when clicking outside the image or arrows
+        document.getElementById("lightbox").addEventListener("click", (e) => {
+            // Close the lightbox only if the clicked area is not the image or arrows
+            if (e.target === document.getElementById("lightbox") || e.target === document.getElementById("closeBtn")) {
+                closeLightbox();
+            }
+        });
+    
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById("darkModeToggle");
+        const darkModeText = document.getElementById("darkModeText");
+    
+        darkModeToggle.addEventListener('change', () => {
+            if (darkModeToggle.checked) {
+                document.body.classList.add("dark-mode");
+                darkModeText.innerText = "Enable Light Mode"; // Update text for dark mode
+            } else {
+                document.body.classList.remove("dark-mode");
+                darkModeText.innerText = "Enable Dark Mode"; // Update text for light mode
+            }
+        });
+    </script>    
+</body>
+</html>
